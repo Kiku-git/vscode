@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { URI } from 'vs/base/common/uri';
+import * as browser from 'vs/base/browser/browser';
 import { IBackupFileService, IResolvedBackup } from 'vs/workbench/services/backup/common/backup';
 import { ITextSnapshot } from 'vs/editor/common/model';
 import { createTextBufferFactoryFromSnapshot } from 'vs/editor/common/model/textModel';
@@ -15,28 +16,22 @@ import { IClipboardService } from 'vs/platform/clipboard/common/clipboardService
 // tslint:disable-next-line: import-patterns no-standalone-editor
 import { IDownloadService } from 'vs/platform/download/common/download';
 import { CancellationToken } from 'vs/base/common/cancellation';
-import { IExtensionHostDebugParams, IDebugParams } from 'vs/platform/environment/common/environment';
 import { IExtensionGalleryService, IQueryOptions, IGalleryExtension, InstallOperation, StatisticType, ITranslation, IGalleryExtensionVersion, IExtensionIdentifier, IReportedExtension, IExtensionManagementService, ILocalExtension, IGalleryMetadata, IExtensionTipsService, ExtensionRecommendationReason, IExtensionRecommendation, IExtensionEnablementService, EnablementState } from 'vs/platform/extensionManagement/common/extensionManagement';
 import { IPager } from 'vs/base/common/paging';
 import { IExtensionManifest, ExtensionType, ExtensionIdentifier, IExtension } from 'vs/platform/extensions/common/extensions';
 import { IURLHandler, IURLService } from 'vs/platform/url/common/url';
 import { ITelemetryService, ITelemetryData, ITelemetryInfo } from 'vs/platform/telemetry/common/telemetry';
-import { AbstractLifecycleService } from 'vs/platform/lifecycle/common/lifecycleService';
-import { ILogService, LogLevel, ConsoleLogService } from 'vs/platform/log/common/log';
-import { ShutdownReason, ILifecycleService } from 'vs/platform/lifecycle/common/lifecycle';
-import { IProductService } from 'vs/platform/product/common/product';
+import { ConsoleLogService } from 'vs/platform/log/common/log';
+import { ILifecycleService } from 'vs/platform/lifecycle/common/lifecycle';
 import { Disposable, IDisposable } from 'vs/base/common/lifecycle';
 import { IStorageService, IWorkspaceStorageChangeEvent, StorageScope, IWillSaveStateEvent, WillSaveStateReason } from 'vs/platform/storage/common/storage';
 import { IUpdateService, State } from 'vs/platform/update/common/update';
-import { IWindowConfiguration, IPath, IPathsToWaitFor, IWindowService, INativeOpenDialogOptions, IEnterWorkspaceResult, IURIToOpen, IMessageBoxResult, IWindowsService, IOpenSettings } from 'vs/platform/windows/common/windows';
-import { IProcessEnvironment } from 'vs/base/common/platform';
+import { IWindowService, INativeOpenDialogOptions, IEnterWorkspaceResult, IURIToOpen, IMessageBoxResult, IWindowsService, IOpenSettings, IWindowSettings } from 'vs/platform/windows/common/windows';
 import { IWorkspaceIdentifier, ISingleFolderWorkspaceIdentifier, IWorkspaceFolderCreationData, IWorkspacesService } from 'vs/platform/workspaces/common/workspaces';
-import { ExportData } from 'vs/base/common/performance';
 import { IRecentlyOpened, IRecent } from 'vs/platform/history/common/history';
 import { ISerializableCommandAction } from 'vs/platform/actions/common/actions';
 import { IWorkspaceEditingService } from 'vs/workbench/services/workspace/common/workspaceEditing';
 import { ITunnelService } from 'vs/platform/remote/common/tunnel';
-import { IWorkbenchEnvironmentService } from 'vs/workbench/services/environment/common/environmentService';
 import { IReloadSessionEvent, IExtensionHostDebugService, ICloseSessionEvent, IAttachSessionEvent, ILogToSessionEvent, ITerminateSessionEvent } from 'vs/workbench/services/extensions/common/extensionHostDebug';
 import { IRemoteConsoleLog } from 'vs/base/common/console';
 // tslint:disable-next-line: import-patterns
@@ -50,6 +45,13 @@ import { CommentingRanges } from 'vs/editor/common/modes';
 import { Range } from 'vs/editor/common/core/range';
 import { isUndefinedOrNull } from 'vs/base/common/types';
 import { IWorkspaceContextService } from 'vs/platform/workspace/common/workspace';
+import { addDisposableListener, EventType } from 'vs/base/browser/dom';
+import { IEditorService, IResourceEditor } from 'vs/workbench/services/editor/common/editorService';
+import { pathsToEditors } from 'vs/workbench/common/editor';
+import { IFileService } from 'vs/platform/files/common/files';
+import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
+import { ParsedArgs } from 'vs/platform/environment/common/environment';
+import { ClassifiedEvent, StrictPropertyCheck, GDPRClassification } from 'vs/platform/telemetry/common/gdprTypings';
 
 //#region Backup File
 
@@ -169,65 +171,6 @@ export class SimpleDownloadService implements IDownloadService {
 }
 
 registerSingleton(IDownloadService, SimpleDownloadService, true);
-
-//#endregion
-
-//#region Environment
-
-export class SimpleWorkbenchEnvironmentService implements IWorkbenchEnvironmentService {
-	configuration: IWindowConfiguration = new SimpleWindowConfiguration();
-	untitledWorkspacesHome: URI;
-	extensionTestsLocationURI?: URI;
-	_serviceBrand: any;
-	args: any;
-	execPath: string;
-	cliPath: string;
-	appRoot: string;
-	userHome: string;
-	userDataPath: string;
-	appNameLong: string = 'Visual Studio Code - Web';
-	appQuality?: string;
-	appSettingsHome: URI;
-	settingsResource: URI;
-	keybindingsResource: URI;
-	machineSettingsHome: URI;
-	machineSettingsResource: URI;
-	settingsSearchBuildId?: number;
-	settingsSearchUrl?: string;
-	globalStorageHome: string;
-	workspaceStorageHome: string;
-	backupHome: string;
-	backupWorkspacesPath: string;
-	workspacesHome: string;
-	isExtensionDevelopment: boolean;
-	disableExtensions: boolean | string[];
-	builtinExtensionsPath: string;
-	extensionsPath: string;
-	extensionDevelopmentLocationURI?: URI[];
-	extensionTestsPath?: string;
-	debugExtensionHost: IExtensionHostDebugParams;
-	debugSearch: IDebugParams;
-	logExtensionHostCommunication: boolean;
-	isBuilt: boolean;
-	wait: boolean;
-	status: boolean;
-	log?: string;
-	logsPath: string;
-	verbose: boolean;
-	skipGettingStarted: boolean;
-	skipReleaseNotes: boolean;
-	skipAddToRecentlyOpened: boolean;
-	mainIPCHandle: string;
-	sharedIPCHandle: string;
-	nodeCachedDataDir?: string;
-	installSourcePath: string;
-	disableUpdates: boolean;
-	disableCrashReporter: boolean;
-	driverHandle?: string;
-	driverVerbose: boolean;
-	webviewEndpoint?: string;
-}
-
 
 //#endregion
 
@@ -458,12 +401,13 @@ export class SimpleExtensionManagementService implements IExtensionManagementSer
 		return Promise.resolve(undefined);
 	}
 
-	install(vsix: URI): Promise<IExtensionIdentifier> {
+	install(vsix: URI): Promise<ILocalExtension> {
 		// @ts-ignore
 		return Promise.resolve(undefined);
 	}
 
-	installFromGallery(extension: IGalleryExtension): Promise<void> {
+	installFromGallery(extension: IGalleryExtension): Promise<ILocalExtension> {
+		// @ts-ignore
 		return Promise.resolve(undefined);
 	}
 
@@ -518,55 +462,6 @@ registerSingleton(IExtensionUrlHandler, SimpleExtensionURLHandler, true);
 
 //#endregion
 
-//#region Lifecycle
-
-export class SimpleLifecycleService extends AbstractLifecycleService {
-
-	_serviceBrand: any;
-
-	constructor(
-		@ILogService readonly logService: ILogService
-	) {
-		super(logService);
-
-		this.registerListeners();
-	}
-
-	private registerListeners(): void {
-		window.onbeforeunload = () => this.beforeUnload();
-	}
-
-	private beforeUnload(): string {
-
-		// Before Shutdown
-		this._onBeforeShutdown.fire({
-			veto(value) {
-				if (value === true) {
-					console.warn(new Error('Preventing onBeforeUnload currently not supported'));
-				} else if (value instanceof Promise) {
-					console.warn(new Error('Long running onBeforeShutdown currently not supported'));
-				}
-			},
-			reason: ShutdownReason.QUIT
-		});
-
-		// Will Shutdown
-		this._onWillShutdown.fire({
-			join() {
-				console.warn(new Error('Long running onWillShutdown currently not supported'));
-			},
-			reason: ShutdownReason.QUIT
-		});
-
-		// @ts-ignore
-		return null;
-	}
-}
-
-registerSingleton(ILifecycleService, SimpleLifecycleService);
-
-//#endregion
-
 //#region Log
 
 export class SimpleLogService extends ConsoleLogService { }
@@ -594,12 +489,13 @@ export class SimpleMultiExtensionsManagementService implements IExtensionManagem
 		return Promise.resolve(undefined);
 	}
 
-	install(vsix: URI): Promise<IExtensionIdentifier> {
+	install(vsix: URI): Promise<ILocalExtension> {
 		// @ts-ignore
 		return Promise.resolve(undefined);
 	}
 
-	installFromGallery(extension: IGalleryExtension): Promise<void> {
+	installFromGallery(extension: IGalleryExtension): Promise<ILocalExtension> {
+		// @ts-ignore
 		return Promise.resolve(undefined);
 	}
 
@@ -625,23 +521,6 @@ export class SimpleMultiExtensionsManagementService implements IExtensionManagem
 		// @ts-ignore
 		return Promise.resolve(undefined);
 	}
-}
-
-//#endregion
-
-//#region Product
-
-export class SimpleProductService implements IProductService {
-
-	_serviceBrand: any;
-
-	version: string = '1.35.0';
-	commit?: string;
-	nameLong: string = '';
-	urlProtocol: string = '';
-	extensionAllowedProposedApi: string[] = [];
-	uiExtensions?: string[];
-	enableTelemetry: boolean = false;
 }
 
 //#endregion
@@ -784,6 +663,10 @@ export class SimpleTelemetryService implements ITelemetryService {
 		return Promise.resolve(undefined);
 	}
 
+	publicLog2<E extends ClassifiedEvent<T> = never, T extends GDPRClassification<T> = never>(eventName: string, data?: StrictPropertyCheck<T, E>) {
+		return this.publicLog(eventName, data as ITelemetryData);
+	}
+
 	setEnabled(value: boolean): void {
 	}
 
@@ -854,48 +737,7 @@ registerSingleton(IURLService, SimpleURLService);
 
 //#region Window
 
-export class SimpleWindowConfiguration implements IWindowConfiguration {
-	_: any[];
-	machineId: string;
-	windowId: number;
-	logLevel: LogLevel;
-
-	mainPid: number;
-
-	appRoot: string;
-	execPath: string;
-	isInitialStartup?: boolean;
-
-	userEnv: IProcessEnvironment;
-	nodeCachedDataDir?: string;
-
-	backupPath?: string;
-
-	workspace?: IWorkspaceIdentifier;
-	folderUri?: ISingleFolderWorkspaceIdentifier;
-
-	remoteAuthority: string = document.location.host;
-
-	zoomLevel?: number;
-	fullscreen?: boolean;
-	maximized?: boolean;
-	highContrast?: boolean;
-	frameless?: boolean;
-	accessibilitySupport?: boolean;
-	partsSplashPath?: string;
-
-	perfStartTime?: number;
-	perfAppReady?: number;
-	perfWindowLoadTime?: number;
-	perfEntries: ExportData;
-
-	filesToOpenOrCreate?: IPath[];
-	filesToDiff?: IPath[];
-	filesToWait?: IPathsToWaitFor;
-	termProgram?: string;
-}
-
-export class SimpleWindowService implements IWindowService {
+export class SimpleWindowService extends Disposable implements IWindowService {
 
 	_serviceBrand: any;
 
@@ -905,6 +747,30 @@ export class SimpleWindowService implements IWindowService {
 	readonly hasFocus = true;
 
 	readonly windowId = 0;
+
+	constructor(
+		@IEditorService private readonly editorService: IEditorService,
+		@IFileService private readonly fileService: IFileService,
+		@IConfigurationService private readonly configurationService: IConfigurationService
+	) {
+		super();
+
+		this._register(addDisposableListener(document, EventType.FULLSCREEN_CHANGE, () => {
+			if (document.fullscreenElement || (<any>document).webkitFullscreenElement) {
+				browser.setFullscreen(true);
+			} else {
+				browser.setFullscreen(false);
+			}
+		}));
+
+		this._register(addDisposableListener(document, EventType.WK_FULLSCREEN_CHANGE, () => {
+			if (document.fullscreenElement || (<any>document).webkitFullscreenElement || (<any>document).webkitIsFullScreen) {
+				browser.setFullscreen(true);
+			} else {
+				browser.setFullscreen(false);
+			}
+		}));
+	}
 
 	isFocused(): Promise<boolean> {
 		return Promise.resolve(this.hasFocus);
@@ -931,6 +797,8 @@ export class SimpleWindowService implements IWindowService {
 	}
 
 	reloadWindow(): Promise<void> {
+		window.location.reload();
+
 		return Promise.resolve();
 	}
 
@@ -950,7 +818,40 @@ export class SimpleWindowService implements IWindowService {
 		return Promise.resolve(undefined);
 	}
 
-	toggleFullScreen(): Promise<void> {
+	toggleFullScreen(target?: HTMLElement): Promise<void> {
+		if (!target) {
+			return Promise.resolve();
+		}
+
+		// Chromium
+		if ((<any>document).fullscreen !== undefined) {
+			if (!(<any>document).fullscreen) {
+
+				return (<any>target).requestFullscreen().catch(() => {
+					// if it fails, chromium throws an exception with error undefined.
+					// re https://developer.mozilla.org/en-US/docs/Web/API/Element/requestFullscreen
+					console.warn('Toggle Full Screen failed');
+				});
+			} else {
+				return document.exitFullscreen().catch(() => {
+					console.warn('Exit Full Screen failed');
+				});
+			}
+		}
+
+		// Safari and Edge 14 are all using webkit prefix
+		if ((<any>document).webkitIsFullScreen !== undefined) {
+			try {
+				if (!(<any>document).webkitIsFullScreen) {
+					(<any>target).webkitRequestFullscreen(); // it's async, but doesn't return a real promise.
+				} else {
+					(<any>document).webkitExitFullscreen(); // it's async, but doesn't return a real promise.
+				}
+			} catch {
+				console.warn('Enter/Exit Full Screen failed');
+			}
+		}
+
 		return Promise.resolve();
 	}
 
@@ -981,8 +882,42 @@ export class SimpleWindowService implements IWindowService {
 		return Promise.resolve();
 	}
 
-	openWindow(_uris: IURIToOpen[], _options?: IOpenSettings): Promise<void> {
+	async openWindow(_uris: IURIToOpen[], _options?: IOpenSettings): Promise<void> {
+		const { openFolderInNewWindow } = this.shouldOpenNewWindow(_options);
+		for (let i = 0; i < _uris.length; i++) {
+			const uri = _uris[i];
+			if ('folderUri' in uri) {
+				const newAddress = `${document.location.origin}/?folder=${uri.folderUri.path}`;
+				if (openFolderInNewWindow) {
+					window.open(newAddress);
+				} else {
+					window.location.href = newAddress;
+				}
+			}
+			if ('workspaceUri' in uri) {
+				const newAddress = `${document.location.origin}/?workspace=${uri.workspaceUri.path}`;
+				if (openFolderInNewWindow) {
+					window.open(newAddress);
+				} else {
+					window.location.href = newAddress;
+				}
+			}
+			if ('fileUri' in uri) {
+				const inputs: IResourceEditor[] = await pathsToEditors([uri], this.fileService);
+				this.editorService.openEditors(inputs);
+			}
+		}
 		return Promise.resolve();
+	}
+
+	private shouldOpenNewWindow(_options: IOpenSettings = {}): { openFolderInNewWindow: boolean } {
+		const windowConfig = this.configurationService.getValue<IWindowSettings>('window');
+		const openFolderInNewWindowConfig = (windowConfig && windowConfig.openFoldersInNewWindow) || 'default' /* default */;
+		let openFolderInNewWindow = !!_options.forceNewWindow && !_options.forceReuseWindow;
+		if (!_options.forceNewWindow && !_options.forceReuseWindow && (openFolderInNewWindowConfig === 'on' || openFolderInNewWindowConfig === 'off')) {
+			openFolderInNewWindow = (openFolderInNewWindowConfig === 'on');
+		}
+		return { openFolderInNewWindow };
 	}
 
 	closeWindow(): Promise<void> {
@@ -1181,6 +1116,10 @@ export class SimpleWindowsService implements IWindowsService {
 	}
 
 	openNewWindow(): Promise<void> {
+		return Promise.resolve();
+	}
+
+	openExtensionDevelopmentHostWindow(args: ParsedArgs): Promise<void> {
 		return Promise.resolve();
 	}
 

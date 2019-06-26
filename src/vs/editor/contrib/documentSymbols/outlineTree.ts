@@ -22,6 +22,7 @@ import { OutlineConfigKeys } from 'vs/editor/contrib/documentSymbols/outline';
 import { MarkerSeverity } from 'vs/platform/markers/common/markers';
 import { IThemeService } from 'vs/platform/theme/common/themeService';
 import { listErrorForeground, listWarningForeground } from 'vs/platform/theme/common/colorRegistry';
+import { KeyCode } from 'vs/base/common/keyCodes';
 
 export type OutlineItem = OutlineGroup | OutlineElement;
 
@@ -38,7 +39,7 @@ export class OutlineNavigationLabelProvider implements IKeyboardNavigationLabelP
 	}
 
 	mightProducePrintableCharacter(event: IKeyboardEvent): boolean {
-		return this._keybindingService.mightProducePrintableCharacter(event);
+		return event.keyCode !== KeyCode.Escape && this._keybindingService.mightProducePrintableCharacter(event);
 	}
 }
 
@@ -225,11 +226,11 @@ export class OutlineItemComparator implements ITreeSorter<OutlineItem> {
 
 		} else if (a instanceof OutlineElement && b instanceof OutlineElement) {
 			if (this.type === OutlineSortOrder.ByKind) {
-				return a.symbol.kind - b.symbol.kind || a.symbol.name.localeCompare(b.symbol.name);
+				return a.symbol.kind - b.symbol.kind || a.symbol.name.localeCompare(b.symbol.name, undefined, { numeric: true });
 			} else if (this.type === OutlineSortOrder.ByName) {
-				return a.symbol.name.localeCompare(b.symbol.name) || Range.compareRangesUsingStarts(a.symbol.range, b.symbol.range);
+				return a.symbol.name.localeCompare(b.symbol.name, undefined, { numeric: true }) || Range.compareRangesUsingStarts(a.symbol.range, b.symbol.range);
 			} else if (this.type === OutlineSortOrder.ByPosition) {
-				return Range.compareRangesUsingStarts(a.symbol.range, b.symbol.range) || a.symbol.name.localeCompare(b.symbol.name);
+				return Range.compareRangesUsingStarts(a.symbol.range, b.symbol.range) || a.symbol.name.localeCompare(b.symbol.name, undefined, { numeric: true });
 			}
 		}
 		return 0;
